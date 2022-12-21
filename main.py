@@ -29,6 +29,7 @@ from engine import evaluate, train_one_epoch, test
 import models
 from util.slconfig import DictAction, SLConfig
 from util.utils import ModelEma, BestMetricHolder
+import wandb
 
 
 def get_args_parser():
@@ -93,6 +94,7 @@ def build_model_main(args):
     return model, criterion, postprocessors
 
 def main(args):
+    wandb.init(name=args.wandb_name, project=args.wandb_project_name)
     utils.init_distributed_mode(args)
     # load cfg file and update the args
     print("Loading config file from {}".format(args.config_file))
@@ -230,7 +232,7 @@ def main(args):
         if not args.eval and 'optimizer' in checkpoint and 'lr_scheduler' in checkpoint and 'epoch' in checkpoint:
             optimizer.load_state_dict(checkpoint['optimizer'])
             lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
-            args.start_epoch = checkpoint['epoch'] + 1
+            # args.start_epoch = checkpoint['epoch'] + 1
 
     if (not args.resume) and args.pretrain_model_path:
         checkpoint = torch.load(args.pretrain_model_path, map_location='cpu')['model']
@@ -273,6 +275,7 @@ def main(args):
 
         return
 
+    wandb.watch(model, log='all')
     print("Start training")
     start_time = time.time()
     best_map_holder = BestMetricHolder(use_ema=args.use_ema)
@@ -325,7 +328,7 @@ def main(args):
             }, checkpoint_path)
         log_stats = {
             **{f'train_{k}': v for k, v in train_stats.items()},
-            **{f'test_{k}': v for k, v in test_stats.items()},
+            **{f'val_{k}': v for k, v in test_stats.items()},
         }
 
         # eval ema
@@ -361,6 +364,7 @@ def main(args):
         epoch_time = time.time() - epoch_start_time
         epoch_time_str = str(datetime.timedelta(seconds=int(epoch_time)))
         log_stats['epoch_time'] = epoch_time_str
+        wandb.log(log_stats, step=epoch)
 
         if args.output_dir and utils.is_main_process():
             with (output_dir / "log.txt").open("a") as f:
@@ -389,9 +393,12 @@ def main(args):
             remove(filename)
 
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('DETR training and evaluation script', parents=[get_args_parser()])
+    parser.add_argument('--wandb_name', help='path to load image for demo')
+    parser.add_argument('--wandb_project_name', help='path to load image for demo')
+    parser.add_argument('--num_classes', help='number of classes', default=None)
+
     args = parser.parse_args()
     if args.output_dir:
         Path(args.output_dir).mkdir(parents=True, exist_ok=True)

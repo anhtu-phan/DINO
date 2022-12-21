@@ -81,10 +81,11 @@ class COCOVisualizer():
             if caption is None:
                 savename = '{}/{}-{}.png'.format(savedir, int(tgt['image_id']), str(datetime.datetime.now()).replace(' ', '-'))
             else:
-                savename = '{}/{}-{}-{}.png'.format(savedir, caption, int(tgt['image_id']), str(datetime.datetime.now()).replace(' ', '-'))
+                savename = '{}/{}.png'.format(savedir, caption)
             print("savename: {}".format(savename))
             os.makedirs(os.path.dirname(savename), exist_ok=True)
-            plt.savefig(savename)
+            plt.axis('off')
+            plt.savefig(savename, bbox_inches='tight')
         plt.close()
 
     def addtgt(self, tgt):
@@ -101,7 +102,7 @@ class COCOVisualizer():
         color = []
         polygons = []
         boxes = []
-        for box in tgt['boxes'].cpu():
+        for i_box, box in enumerate(tgt['boxes'].cpu()):
             unnormbbox = box * torch.Tensor([W, H, W, H])
             unnormbbox[:2] -= unnormbbox[2:] / 2
             [bbox_x, bbox_y, bbox_w, bbox_h] = unnormbbox.tolist()
@@ -109,8 +110,11 @@ class COCOVisualizer():
             poly = [[bbox_x, bbox_y], [bbox_x, bbox_y+bbox_h], [bbox_x+bbox_w, bbox_y+bbox_h], [bbox_x+bbox_w, bbox_y]]
             np_poly = np.array(poly).reshape((4,2))
             polygons.append(Polygon(np_poly))
-            c = (np.random.random((1, 3))*0.6+0.4).tolist()[0]
-            color.append(c)
+            if 'box_colors' in tgt:
+                color.append(tgt['box_colors'][i_box])
+            else:
+                c = (np.random.random((1, 3))*0.6+0.4).tolist()[0]
+                color.append(c)
 
         p = PatchCollection(polygons, facecolor=color, linewidths=0, alpha=0.1)
         ax.add_collection(p)

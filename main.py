@@ -397,7 +397,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser('DETR training and evaluation script', parents=[get_args_parser()])
     parser.add_argument('--wandb_name', help='path to load image for demo')
     parser.add_argument('--wandb_project_name', help='path to load image for demo')
-    parser.add_argument('--num_classes', help='number of classes', default=None)
 
     args = parser.parse_args()
     if args.output_dir:

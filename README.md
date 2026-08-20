@@ -1,3 +1,18 @@
+## Fork note — what I changed
+
+This is my working fork of **[IDEA-Research/DINO](https://github.com/IDEA-Research/DINO)**, used for object-detection experiments in 2022–2023 on a shared university GPU cluster running Slurm. The model and the original code are the upstream authors'; **everything below the horizontal rule is their README, unchanged.**
+
+What I added on top:
+
+- **`scripts/run.sh` — a training entry point that builds the model's CUDA operators inside the job itself.** It runs `cd models/dino/ops && python setup.py build install` before training, so the extensions compile against whichever node the scheduler assigns rather than against whatever happened to be on the login node. It then launches with `torch.distributed.launch`, points at VisDrone in COCO format, and fine-tunes from the released `checkpoint0033_4scale` with `--finetune_ignore label_enc.weight class_embed` so the classification head is re-learned for a new label set. Weights & Biases logging is wired in.
+- **`scripts/submit.sh`** — the Slurm job script: `--partition=students`, `--gres=gpu:1`, `--mem=16000`, mail on every state change. It activates the conda environment and `srun`s the run script.
+- **A container built for this model's CUDA operators.** `Dockerfile` starts from `nvcr.io/nvidia/pytorch:22.04-py3`, removes the bundled PyTorch and reinstalls pinned CUDA-matched wheels (`torch==1.8.0+cu111`, `torchvision==0.9.0+cu111`, `torchaudio==0.8.0`), sets `CUDA_HOME` and installs `Cython` first.
+- **`--num_classes` as a command-line argument** (`main.py`, `models/dino/dino.py`), plus `demo.py` for single-image inference and small changes to `engine.py` and `util/visualizer.py`.
+
+Trace any of it with `git log --author=anhtu95`.
+
+---
+
 # DINO <img src="figs/dinosaur.png" width="30">
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/dino-detr-with-improved-denoising-anchor-1/object-detection-on-coco-minival)](https://paperswithcode.com/sota/object-detection-on-coco-minival?p=dino-detr-with-improved-denoising-anchor-1)
 [![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/dino-detr-with-improved-denoising-anchor-1/object-detection-on-coco)](https://paperswithcode.com/sota/object-detection-on-coco?p=dino-detr-with-improved-denoising-anchor-1)
